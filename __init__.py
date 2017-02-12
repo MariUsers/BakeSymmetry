@@ -1,6 +1,6 @@
-import BakeSymmetry.BakeSymmetry_v2 as SymmetryBake
+import BakeSymmetry.BakeSymmetry_v2 as MirrorBake
 
-SymmetryBake.BakeSymmetry()
+MirrorBake.mirrorToolbarActions()
 
 
 

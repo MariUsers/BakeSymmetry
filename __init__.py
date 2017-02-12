@@ -1,4 +1,7 @@
-import BakeSymmetry.BakeSymmetry_v2 as Bake
-Bake.BakeSymmetryTest()
+import BakeSymmetry.BakeSymmetry_v2 as SymmetryBake
 
-print "INIT BAKE SYMMETRY"
+SymmetryBake.BakeSymmetry()
+
+
+
+

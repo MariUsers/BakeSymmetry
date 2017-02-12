@@ -1,4 +1,7 @@
-import BakeSymmetry.BakeSymmetry_v2 as Bake
-Bake.BakeSymmetryTest()
+import BakeSymmetry.BakeSymmetry_v2 as MirrorBake
 
-print "INIT BAKE SYMMETRY"
+MirrorBake.mirrorToolbarActions()
+
+
+
+

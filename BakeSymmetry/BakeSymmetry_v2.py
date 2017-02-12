@@ -3,174 +3,206 @@ import PySide
 import os
 
 
-class BakeSymmetryTest(PySide.QtGui.QWidget):
+def mirror_bake():
+	'''Executes a Mirror Bake'''
 
-    def __init__(self):
-        super(BakeSymmetryTest, self).__init__()
-        self.script_path = self.script_path()
-        self.scriptIconDir = os.path.join(self.script_path, 'Icons')
-        print "V2 BAKE ICONS: " + self.scriptIconDir
+	actions = mirrorActions()
+	X = actions['X'][1]
+	Y = actions['Y'][1]
+	Z = actions['Z'][1]
 
-        self.initUI()
-        #self.shortcuts()
+	x=1
+	y=1
+	z=1
+	pbx=1
+	pby=1
 
-    def initUI(self):
-        ''' Creating UI and Connections '''
+	if X.isChecked():
+		x = -1
+		pbx = -1
+	elif Y.isChecked():
+		y = -1
+		pbx = -1
+	elif Z.isChecked():
+		z = -1
+		pbx = -1
 
-        bakeIcon = PySide.QtGui.QIcon()
-        bakeIcon.addPixmap(PySide.QtGui.QPixmap('%s/BakeShader.png' % self.scriptIconDir))
+	canvas = mari.canvases.current()
+	camera = canvas.camera()
 
-        grid = PySide.QtGui.QGridLayout()
-        grid.setSpacing(10)
+	#Avoid Mirroring in the UV Viewport.
+	if camera.UV == camera.type():
+		return
 
-        # Combo Box
-        self.comboSymmetryXYZ = PySide.QtGui.QComboBox()
-        self.comboSymmetryXYZ.addItem("Auto Clear")
-        self.comboSymmetryXYZ.addItem("Manual Clear")
-        grid.addWidget(self.comboSymmetryXYZ,0,0,1,2)
 
-        # Radio Buttons
-        self.x_axis = PySide.QtGui.QRadioButton("X")
-        self.y_axis = PySide.QtGui.QRadioButton("Y")
-        self.z_axis = PySide.QtGui.QRadioButton("Z")
-        self.x_axis.setChecked(True)
+	bake = mari.actions.find("/Mari/Canvas/Bake")
 
-        # Setting Grid view
-        grid.addWidget(self.x_axis,0,2)
-        grid.addWidget(self.y_axis,0,3)
-        grid.addWidget(self.z_axis,0,4)
+	paintBuffer = mari.canvases.paintBuffer()
+	currentpaint = paintBuffer.saveContent()
 
-        # Bake Button
-        bSymmetry = PySide.QtGui.QPushButton("Bake")
-        bSymmetry.setIcon(bakeIcon)
-        grid.addWidget(bSymmetry,1,0,5,0)
+	pb_scale = paintBuffer.scale()
+	pb_rotation = paintBuffer.rotation()
+	pb_translation = paintBuffer.translation()
 
-        self.setLayout(grid)
+	lookAt = camera.lookAt()
+	translation = camera.translation()
+	up = camera.up()
 
-        bSymmetry.clicked.connect(self.mirror_bake)
+	#Move to mirrored position
+	camera.setLookAt(mari.VectorN(x*lookAt.x(),y*lookAt.y(),z*lookAt.z()))
+	camera.setTranslation(mari.VectorN(x*translation.x(),y*translation.y(),z*translation.z()))
+	camera.setUp(mari.VectorN(x*up.x(),y*up.y(),z*up.z()))
 
-    def script_path(self):
-        ''' Loops through the Mari user dirs finding the script location '''
-        for script_paths in mari.resources.path(mari.resources.USER_SCRIPTS).split(";"):
-    		for dirname, folder, files in os.walk(script_paths):
-    			if "BakeSymmetry" in str(dirname):
-    				scriptPath = os.path.join(dirname)
-    				print "Script Install Path: " + str(scriptPath)
-    				return scriptPath
+	#Mirror paint buffer
+	paintBuffer.setScale(PySide.QtCore.QSizeF(pbx*pb_scale.width(),pby*pb_scale.height()))
+	paintBuffer.setTranslation(pb_translation)
+	paintBuffer.setRotation(pb_rotation)
 
-    def shortcuts_menu(self):
-        #Mari custom shortcuts actions.
-        actionSymmetryBakeX = mari.actions.create('Bake Symmetry X', 'mirror_bake()')
-        actionSymmetryBakeX.setShortcut("Shift+X")
-        mari.menus.addAction( actionSymmetryBakeX, "MainWindow/d&eTools/&Symmetry" )
+	# #disconnect to avoid looping
+	paintBuffer.aboutToBake.disconnect(mirror_bake)
 
-        actionSymmetryBakeY = mari.actions.create('Bake Symmetry Y', 'symmetryBakeY()')
-        actionSymmetryBakeY.setShortcut("Shift+Y")
-        mari.menus.addAction( actionSymmetryBakeY, "MainWindow/d&eTools/&Symmetry")
+	#Bake from the mirrored position first
+	bake.trigger()
 
-        actionSymmetryBakeZ = mari.actions.create('Bake Symmetry Z', 'symmetryBakeZ()')
-        actionSymmetryBakeZ.setShortcut("Shift+Z")
-        mari.menus.addAction( actionSymmetryBakeZ, "MainWindow/d&eTools/&Symmetry")
+	#Restore the original position
+	camera.setLookAt(lookAt)
+	camera.setTranslation(translation)
+	camera.setUp(up)
+	#Resotre the original paint buffer
+	paintBuffer.setScale(pb_scale)
+	paintBuffer.setTranslation(pb_translation)
+	paintBuffer.setRotation(pb_rotation)
+	paintBuffer.restoreContent()
 
-        actionCameraInverseX = mari.actions.create('Invert Canvas X', 'cameraInverseX()')
-        actionCameraInverseX.setShortcut("Ctrl+Shift+X")
-        mari.menus.addAction( actionCameraInverseX, "MainWindow/d&eTools/&Symmetry")
+	currentBehave = mari.projection.getProperty("Projection/bakeBehavior")
 
-        actionCameraInverseY = mari.actions.create('Invert Canvas Y', 'cameraInverseY()')
-        actionCameraInverseY.setShortcut("Ctrl+Shift+Y")
-        mari.menus.addAction( actionCameraInverseY, "MainWindow/d&eTools/&Symmetry")
+	bake.trigger()
+	mari.projection.setProperty("Projection/bakeBehavior", currentBehave)
 
-        actionCameraInverseZ = mari.actions.create('Invert Canvas Z', 'cameraInverseZ()')
-        actionCameraInverseZ.setShortcut("Ctrl+Shift+Z")
-        mari.menus.addAction( actionCameraInverseZ, "MainWindow/d&eTools/&Symmetry")
+	#reconnect now that we already passed the bake steps and avoided the loop.
+	paintBuffer.aboutToBake.connect(mirror_bake)
 
-    def is_checked():
-        ''' Checks or sets the axis '''
+# --------------------------------------------------------------------
 
-        self.x_axis.setChecked(True)
+def SymmetryModeX():
+	'''Action Target X Symmetry'''
 
-    def bake(self):
-        ''' '''
+	paintBuffer = mari.canvases.paintBuffer()
 
-    def mirror_bake(self):
+	actions = mirrorActions()
+	X = actions['X'][1]
+	Y = actions['Y'][1]
+	Z = actions['Z'][1]
 
-        x=1
-        y=1
-        z=1
-        pbx=1
-        pby=1
+	if Y.isChecked():
+		mari.utils.disconnect(paintBuffer.aboutToBake,mirror_bake)
+		Y.setChecked(False)
+	if Z.isChecked():
+		mari.utils.disconnect(paintBuffer.aboutToBake,mirror_bake)
+		Z.setChecked(False)
 
-        if self.x_axis.isChecked():
-            x = -1
-            pbx = -1
-        elif self.y_axis.isChecked():
-            y = -1
-            pbx = -1
-        elif self.z_axis.isChecked():
-            z = -1
-            pbx = -1
+	if X.isChecked():
+		paintBuffer.aboutToBake.connect(mirror_bake)
+	else:
+		mari.utils.disconnect(paintBuffer.aboutToBake,mirror_bake)
 
-        canvas = mari.canvases.current()
-        camera = canvas.camera()
+def SymmetryModeY():
+	'''Action Target Y Symmetry'''
 
-        bake = mari.actions.find("/Mari/Canvas/Bake")
+	paintBuffer = mari.canvases.paintBuffer()
 
-        paintbuffer = mari.canvases.paintBuffer()
-        currentpaint = paintbuffer.saveContent()
+	actions = mirrorActions()
+	X = actions['X'][1]
+	Y = actions['Y'][1]
+	Z = actions['Z'][1]
 
-        pb_scale = paintbuffer.scale()
-        pb_rotation = paintbuffer.rotation()
-        pb_translation = paintbuffer.translation()
+	if X.isChecked():
+		mari.utils.disconnect(paintBuffer.aboutToBake,mirror_bake)
+		X.setChecked(False)
+	if Z.isChecked():
+		mari.utils.disconnect(paintBuffer.aboutToBake,mirror_bake)
+		Z.setChecked(False)
 
-        lookAt = camera.lookAt()
-        translation = camera.translation()
-        up = camera.up()
+	if Y.isChecked():
+		paintBuffer.aboutToBake.connect(mirror_bake)
+	else:
+		mari.utils.disconnect(paintBuffer.aboutToBake,mirror_bake)
 
-        #Move to mirrored position
-        camera.setLookAt(mari.VectorN(x*lookAt.x(),y*lookAt.y(),z*lookAt.z()))
-        camera.setTranslation(mari.VectorN(x*translation.x(),y*translation.y(),z*translation.z()))
-        camera.setUp(mari.VectorN(x*up.x(),y*up.y(),z*up.z()))
+def SymmetryModeZ():
+	'''Action Target Z Symmetry'''
 
-        #Mirror paint buffer
-        paintbuffer.setScale(PySide.QtCore.QSizeF(pbx*pb_scale.width(),pby*pb_scale.height()))
-        paintbuffer.setTranslation(pb_translation)
-        paintbuffer.setRotation(pb_rotation)
+	paintBuffer = mari.canvases.paintBuffer()
 
-        #Bake from the mirrored position first
-        bake.trigger()
+	actions = mirrorActions()
+	X = actions['X'][1]
+	Y = actions['Y'][1]
+	Z = actions['Z'][1]
 
-        #Restore the original position
-        camera.setLookAt(lookAt)
-        camera.setTranslation(translation)
-        camera.setUp(up)
-        #Resotre the original paint buffer
-        paintbuffer.setScale(pb_scale)
-        paintbuffer.setTranslation(pb_translation)
-        paintbuffer.setRotation(pb_rotation)
-        paintbuffer.restoreContent()
+	if X.isChecked():
+		mari.utils.disconnect(paintBuffer.aboutToBake,mirror_bake)
+		X.setChecked(False)
+	if Y.isChecked():
+		mari.utils.disconnect(paintBuffer.aboutToBake,mirror_bake)
+		Y.setChecked(False)
 
-        currentBehave = mari.projection.getProperty("Projection/bakeBehavior")
+	if Z.isChecked():
+		paintBuffer.aboutToBake.connect(mirror_bake)
+	else:
+		mari.utils.disconnect(paintBuffer.aboutToBake,mirror_bake)
 
-        # Set behaviour of bake
-        print self.comboSymmetryXYZ.currentIndex()
 
-        if self.comboSymmetryXYZ.currentIndex() == 0:
-            mari.projection.setProperty("Projection/bakeBehavior", "AutoBakeAndClear")
-        else:
-            mari.projection.setProperty("Projection/bakeBehavior", "Manual")
+# --------------------------------------------------------------------
 
-        #Bake again from the original position
-        bake.trigger()
-        mari.projection.setProperty("Projection/bakeBehavior", currentBehave)
+def mirrorActions():
+	''' convenience dictionary for all the actions'''
 
-        print("Resetting Bake Behavior")
+	x = '/Mari/Scripts/Mirror X'
+	y = '/Mari/Scripts/Mirror Y'
+	z = '/Mari/Scripts/Mirror Z'
 
-        self.clearType = self.comboSymmetryXYZ.currentIndex()
-        print self.clearType
+	x_act = mari.actions.find(x)
+	y_act = mari.actions.find(y)
+	z_act = mari.actions.find(z)
 
-bakeWidget = BakeSymmetryTest()
-pal = mari.palettes.create("Bake Symmetry V2", bakeWidget)
-pal.show()
+	actions = {
+				'X':(x,x_act),
+				'Y':(y,y_act),
+				'Z':(z,z_act)
+			}
+
+	return actions
+
+
+def mirrorToolbarActions():
+	'''adds actions to mari ui'''
+
+	icon_path = os.path.join(os.path.dirname(__file__), "Icons")
+
+	mirrorX= mari.actions.create ('Mirror X', 'MirrorBake.SymmetryModeX()')
+	mirrorY= mari.actions.create ('Mirror Y', 'MirrorBake.SymmetryModeY()')
+	mirrorZ= mari.actions.create ('Mirror Z', 'MirrorBake.SymmetryModeZ()')
+	mirrorX.setCheckable(True)
+	mirrorY.setCheckable(True)
+	mirrorZ.setCheckable(True)
+
+
+	mari.actions.addToSet('RequiresProject',mirrorX)
+	mari.actions.addToSet('RequiresProject',mirrorY)
+	mari.actions.addToSet('RequiresProject',mirrorZ)
+
+
+	mirrorX.setIconPath(icon_path + os.sep + 'X.png')
+	mirrorY.setIconPath(icon_path + os.sep + 'Y.png')
+	mirrorZ.setIconPath(icon_path + os.sep + 'Z.png')
+
+	toolbar = mari.app.findToolBar('Mirroring')
+	toolbar.setLocked(False)
+	toolbar.addSeparator()
+	toolbar.addActionBefore('/Mari/Scripts/Mirror X',None,False)
+	toolbar.addActionBefore('/Mari/Scripts/Mirror Y',None,False)
+	toolbar.addActionBefore('/Mari/Scripts/Mirror Z',None,False)
+	toolbar.setLocked(True)
+
 
 if __name__ == "__main__":
-    BakeSymmetryTest()
+	mirrorToolbarActions()
